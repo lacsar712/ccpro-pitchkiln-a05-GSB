@@ -1,8 +1,64 @@
 from django import forms
 from django.utils import timezone
 
-from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
+from .models import (
+    CookRun,
+    FireHearth,
+    NightDutyCard,
+    ResinLot,
+    SoftPointProbe,
+)
 from .services.floor_rules import assert_can_enter_drawing
+
+
+class NightDutyCardForm(forms.ModelForm):
+    class Meta:
+        model = NightDutyCard
+        fields = [
+            "lane",
+            "dutyDate",
+            "shiftName",
+            "maxActiveHearths",
+            "supervisorName",
+        ]
+        widgets = {
+            "lane": forms.NumberInput(attrs={"class": "field", "min": 1}),
+            "dutyDate": forms.DateInput(
+                attrs={"class": "field", "type": "date"}
+            ),
+            "shiftName": forms.TextInput(
+                attrs={"class": "field", "placeholder": "如：夜班 / 小夜班"}
+            ),
+            "maxActiveHearths": forms.NumberInput(
+                attrs={"class": "field", "min": 0, "step": 1}
+            ),
+            "supervisorName": forms.TextInput(attrs={"class": "field"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["dutyDate"].input_formats = ["%Y-%m-%d"]
+        if not self.is_bound and not (self.instance and self.instance.pk):
+            self.initial["dutyDate"] = timezone.localdate().strftime("%Y-%m-%d")
+            self.initial["shiftName"] = "夜班"
+            self.initial["maxActiveHearths"] = 1
+
+    def clean(self):
+        cleaned = super().clean()
+        lane = cleaned.get("lane")
+        duty_date = cleaned.get("dutyDate")
+        shift_name = cleaned.get("shiftName")
+        if lane is not None and duty_date is not None and shift_name:
+            qs = NightDutyCard.objects.filter(
+                lane=lane, dutyDate=duty_date, shiftName=shift_name
+            )
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(
+                    "该过道 + 值班日 + 班次的在岗卡已存在，请直接改原卡上限。"
+                )
+        return cleaned
 
 
 class ResinLotForm(forms.ModelForm):

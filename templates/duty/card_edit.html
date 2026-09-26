@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}改在岗卡上限{% endblock %}
+{% block content %}
+<section class="feed-head">
+  <div>
+    <h1>改夜班在岗卡</h1>
+    <p class="board-sub">
+      过道 {{ card.lane }} · {{ card.dutyDate|date:"Y-m-d" }} · {{ card.shiftName }}
+    </p>
+  </div>
+  <a class="back-link" href="{% url 'night_duty_cards' %}">← 回在岗卡列表</a>
+</section>
+
+<form method="post" class="lot-intake stack-form duty-edit-form">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn-ember">保存</button>
+  <p class="ember-hint">
+    改完上限后，下一笔装料→升温 / 升温→保温立即按新上限校验（在岗数实时统计，仅升温+保温）。
+  </p>
+</form>
+{% endblock %}

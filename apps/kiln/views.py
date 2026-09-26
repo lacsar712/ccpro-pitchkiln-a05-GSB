@@ -8,9 +8,19 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import OpenCookRunForm, PhaseChangeForm, ResinLotForm, SoftPointProbeForm
-from .models import CookRun, FireHearth, ResinLot
-from .services.floor_rules import change_hearth_phase
+from .forms import (
+    NightDutyCardForm,
+    OpenCookRunForm,
+    PhaseChangeForm,
+    ResinLotForm,
+    SoftPointProbeForm,
+)
+from .models import CookRun, FireHearth, NightDutyCard, ResinLot
+from .services.floor_rules import (
+    change_hearth_phase,
+    lane_duty_status,
+    on_duty_hearth_count,
+)
 
 
 def _wants_htmx(request):
@@ -38,9 +48,15 @@ def _board_context():
         (key, label, sum(1 for h in hearths if h.phase == key))
         for key, label in FireHearth.PHASE_CHOICES
     ]
+    # 每条过道附带当日夜班在岗卡与实时在岗数
+    # （在岗数与改相位拦截同源调用 on_duty_hearth_count）
+    lane_rows = []
+    for lane, tiles in sorted(lanes.items()):
+        card, active = lane_duty_status(lane)
+        lane_rows.append((lane, tiles, card, active))
     return {
         "hearths": hearths,
-        "lanes": sorted(lanes.items()),
+        "lanes": lane_rows,
         "phase_legend": phase_legend,
     }
 
@@ -50,10 +66,13 @@ def _drawer_context(hearth):
     probes = []
     if open_run:
         probes = list(open_run.probes.order_by("-sampledAt", "-id"))
+    duty_card, duty_active = lane_duty_status(hearth.lane)
     return {
         "hearth": hearth,
         "open_run": open_run,
         "probes": probes,
+        "duty_card": duty_card,
+        "duty_active": duty_active,
         "phase_form": PhaseChangeForm(hearth=hearth),
         "probe_form": SoftPointProbeForm() if open_run else None,
         "open_run_form": OpenCookRunForm(hearth=hearth) if open_run is None else None,
@@ -209,3 +228,53 @@ def resin_lot_feed(request):
 
     lots = ResinLot.objects.all()[:40]
     return render(request, "resin/feed.html", {"lots": lots, "form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def night_duty_cards(request):
+    """夜班在岗卡：建卡 / 改上限列表页。"""
+    if request.method == "POST":
+        form = NightDutyCardForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                f"夜班在岗卡已建：过道 {form.instance.lane} · "
+                f"{form.instance.dutyDate:%Y-%m-%d} · {form.instance.shiftName}",
+            )
+            return redirect("night_duty_cards")
+    else:
+        form = NightDutyCardForm()
+
+    cards = list(NightDutyCard.objects.all()[:60])
+    today = timezone.localdate()
+    for card in cards:
+        # 仅当日卡显示实时在岗数；历史卡只留档
+        card.live_active = (
+            on_duty_hearth_count(card.lane) if card.dutyDate == today else None
+        )
+    return render(
+        request,
+        "duty/cards.html",
+        {"cards": cards, "form": form, "today": today},
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def edit_night_duty_card(request, pk):
+    """改上限（改完下一笔改相位立即吃新上限，计数本就实时查表）。"""
+    card = get_object_or_404(NightDutyCard, pk=pk)
+    if request.method == "POST":
+        form = NightDutyCardForm(request.POST, instance=card)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                f"在岗卡已更新：过道 {card.lane} 上限 → {card.maxActiveHearths}",
+            )
+            return redirect("night_duty_cards")
+    else:
+        form = NightDutyCardForm(instance=card)
+    return render(request, "duty/card_edit.html", {"card": card, "form": form})

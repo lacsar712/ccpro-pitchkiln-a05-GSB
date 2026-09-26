@@ -1,6 +1,33 @@
 from django.db import models
 
 
+class NightDutyCard(models.Model):
+    """夜班在岗卡：同一自然日 + 过道 + 班次下，升温/保温灶的在岗上限。"""
+
+    lane = models.PositiveIntegerField("过道号")
+    dutyDate = models.DateField("值班日")
+    shiftName = models.CharField("班次名称", max_length=40)
+    maxActiveHearths = models.PositiveIntegerField("上限灶数（人灶同数）")
+    supervisorName = models.CharField("值班主管姓名", max_length=80)
+
+    class Meta:
+        ordering = ["-dutyDate", "lane", "shiftName"]
+        verbose_name = "夜班在岗卡"
+        verbose_name_plural = "夜班在岗卡"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lane", "dutyDate", "shiftName"],
+                name="uniq_lane_date_shift",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"L{self.lane} · {self.dutyDate:%Y-%m-%d} · {self.shiftName} "
+            f"· 上限{self.maxActiveHearths}"
+        )
+
+
 class ResinLot(models.Model):
     lotCode = models.CharField("来脂批号", max_length=64, unique=True)
     originPlace = models.CharField("来源地", max_length=120)

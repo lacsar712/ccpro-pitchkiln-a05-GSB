@@ -1,6 +1,20 @@
 from django.contrib import admin
 
-from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
+from .models import CookRun, FireHearth, NightDutyCard, ResinLot, SoftPointProbe
+
+
+@admin.register(NightDutyCard)
+class NightDutyCardAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "lane",
+        "dutyDate",
+        "shiftName",
+        "maxActiveHearths",
+        "supervisorName",
+    )
+    list_filter = ("lane", "dutyDate", "shiftName")
+    search_fields = ("supervisorName", "shiftName")
 
 
 @admin.register(ResinLot)

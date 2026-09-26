@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
+from .models import CookRun, FireHearth, NightDutyCard, ResinLot, SoftPointProbe
 
 
 def ensure_seed_data():
@@ -68,7 +68,7 @@ def ensure_seed_data():
         lane=3,
         tag="坳火-夜班",
         resinGrade="浮油级",
-        phase=FireHearth.PHASE_CHARGING,
+        phase=FireHearth.PHASE_RAMPING,
     )
 
     run1 = CookRun.objects.create(
@@ -131,4 +131,29 @@ def ensure_seed_data():
         openedAt=now - timezone.timedelta(minutes=40),
         closedAt=None,
         targetSoftPointC=Decimal("87.00"),
+    )
+
+    # 夜班在岗卡：过道 + 自然日 + 班次唯一；在岗数只计升温/保温。
+    # 过道3 上限 1 且已有一灶升温（h5 坳火-夜班）——再来一笔装料→升温会被拦。
+    today = timezone.localdate()
+    NightDutyCard.objects.create(
+        lane=1,
+        dutyDate=today,
+        shiftName="夜班",
+        maxActiveHearths=2,
+        supervisorName="祁大山",
+    )
+    NightDutyCard.objects.create(
+        lane=2,
+        dutyDate=today,
+        shiftName="夜班",
+        maxActiveHearths=1,
+        supervisorName="苗晚晴",
+    )
+    NightDutyCard.objects.create(
+        lane=3,
+        dutyDate=today,
+        shiftName="夜班",
+        maxActiveHearths=1,
+        supervisorName="岑守夜",
     )

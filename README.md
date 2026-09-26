@@ -54,13 +54,38 @@ python manage.py runserver 0.0.0.0:4710
 2. **FireHearth（灶台）**：`lane`、`tag`（唯一）、`resinGrade`、相位 `cold|charging|ramping|holding|drawing`
 3. **CookRun（熬制值守）**：归属灶台与来脂批、`openedAt`、`closedAt`（可空）、`targetSoftPointC`
 4. **SoftPointProbe（软化点探针）**：归属值守、`sampledAt`、`softPointC`、`samplerName`
+5. **NightDutyCard（夜班在岗卡）**：`lane`（过道号）、`dutyDate`（值班日）、
+   `shiftName`（班次名称）、`maxActiveHearths`（上限灶数，人灶同数）、
+   `supervisorName`（值班主管姓名）；**过道 + 值班日 + 班次三者唯一**
 
-**业务规则**：将灶台相位切到 `drawing`（出胶）时，进行中的 CookRun 必须至少有一条 SoftPointProbe 的 `softPointC ≤ 95`。逻辑在 `apps/kiln/services/floor_rules.py`，由相位切换入口调用。
+**业务规则一（出胶）**：将灶台相位切到 `drawing`（出胶）时，进行中的 CookRun
+必须至少有一条 SoftPointProbe 的 `softPointC ≤ 95`。
+
+**业务规则二（夜班在岗卡）**：装料→升温（`charging→ramping`）、
+升温→保温（`ramping→holding`）两步改相位前先校验：
+
+- **在岗数如何计数**：同一过道当前相位为「升温 `ramping`」或「保温 `holding`」
+  的灶台数；**出胶 `drawing` 与冷灶 `cold`、装料 `charging` 一律不计入在岗**。
+  同一灶从升温改保温（本就在岗）不重复占额。
+- 该过道当日**没有在岗卡** → 拒绝，并提示先建卡（左侧班次条「岗」或
+  `/night-duty/`）。
+- 在岗数**已达卡上限** → 拒绝；把上限改大后，**下一笔改相位立即按新上限
+  校验**（计数实时查表，无缓存）。
+- 计数函数 `on_duty_hearth_count()` 与改相位统一入口
+  `change_hearth_phase()` 同在 `apps/kiln/services/floor_rules.py`，
+  看板过道旁的实时在岗数也调同一函数，三处同源。
+
+只建卡而不拦截改相位、或把出胶灶计入在岗，均视为未实现本规则。
 
 ## 界面
 
-- 首页：**灶台值守看板** — 左侧班次条 + 按过道排布的灶台瓦片；点瓦片打开右侧抽屉（值守、探针时间线、改相位 / 登记探针 / 开灶）
+- 首页：**灶台值守看板** — 左侧班次条 + 按过道排布的灶台瓦片；每条过道旁显示
+  当日在岗卡的「实时在岗 / 上限」（满额标红、无卡黄色警示并可直达建卡）；
+  点瓦片打开右侧抽屉（值守、探针时间线、改相位 / 登记探针 / 开灶，
+  抽屉内也显示本过道在岗计数与改上限入口）
 - 次页：**来脂批** — 卡片时间线，非宽表 CRUD
+- **夜班在岗卡**（班次条「岗」，`/night-duty/`）— 建卡 / 改上限列表，
+  当日卡显示实时在岗数
 
 ## 种子数据
 
@@ -69,6 +94,10 @@ python manage.py seed_data
 ```
 
 幂等：已有灶台则只保证账号存在。样例地名仅用「松脂坳 / 桐油坑」系。
+种子含三张今日夜班在岗卡：过道 1 上限 2（已有升温 + 保温各一，2/2 满额）、
+过道 2 上限 1（仅一出胶灶，不计在岗，0/1）、**过道 3 上限 1 且已有一灶
+「坳火-夜班」升温（1/1）**，此时过道 3 再来一笔装料→升温会被拦，改大上限后
+立即放行。
 
 ## 目录结构
 
@@ -83,5 +112,6 @@ PitchKiln-01/
   apps/kiln/          # 模型、视图、floor_rules、种子
   templates/floor/    # 值守看板 + 抽屉
   templates/resin/    # 来脂批时间线
+  templates/duty/     # 夜班在岗卡列表 + 改上限
   static/css/         # 值守台 ops-console 样式
 ```

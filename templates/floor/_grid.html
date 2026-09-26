@@ -3,30 +3,47 @@
      hx-get="{% url 'floor_grid' %}"
      hx-trigger="floor-refresh from:body"
      hx-swap="outerHTML">
-  {% for lane, tiles in lanes %}
+  {% for lane, tiles, card, active in lanes %}
   <div class="lane-row">
     <div class="lane-label">过道 {{ lane }}</div>
-    <div class="tile-row">
-      {% for h in tiles %}
-      {% with open=h.open_runs_cache.0 %}
-      <button type="button"
-              class="hearth-tile phase-{{ h.phase }}"
-              hx-get="{% url 'hearth_drawer' h.pk %}"
-              hx-target="#hearth-drawer"
-              hx-swap="innerHTML"
-              onclick="document.getElementById('hearth-drawer').classList.add('open')">
-        <span class="tile-tag">{{ h.tag }}</span>
-        <span class="tile-phase">{{ h.get_phase_display }}</span>
-        <span class="tile-grade">{{ h.resinGrade }}</span>
-        {% if open %}
-        <span class="tile-temp mono">目标 {{ open.targetSoftPointC }}℃</span>
-        <span class="tile-lot">{{ open.resinLot.lotCode }}</span>
+    <div class="lane-body">
+      <div class="lane-duty">
+        {% if card %}
+        <span class="duty-pill {% if active >= card.maxActiveHearths %}full{% else %}free{% endif %}"
+              title="只计升温+保温；出胶/冷灶不计。{{ card.shiftName }} · 值班主管 {{ card.supervisorName }}">
+          夜班在岗 <b class="mono">{{ active }}</b>/<b class="mono">{{ card.maxActiveHearths }}</b>
+          <span class="duty-meta">{{ card.shiftName }} · {{ card.dutyDate|date:"m-d" }} · {{ card.supervisorName }}</span>
+          <a class="duty-edit" href="{% url 'edit_night_duty_card' card.pk %}">改上限</a>
+        </span>
         {% else %}
-        <span class="tile-temp mono muted">无开灶</span>
+        <span class="duty-pill none" title="今日该过道尚无夜班在岗卡，升温/保温将被拒绝">
+          夜班在岗 <b class="mono">{{ active }}</b> <span class="duty-warn">今日无卡 · 升温将被拦</span>
+          <a class="duty-edit" href="{% url 'night_duty_cards' %}">去建卡</a>
+        </span>
         {% endif %}
-      </button>
-      {% endwith %}
-      {% endfor %}
+      </div>
+      <div class="tile-row">
+        {% for h in tiles %}
+        {% with open=h.open_runs_cache.0 %}
+        <button type="button"
+                class="hearth-tile phase-{{ h.phase }}"
+                hx-get="{% url 'hearth_drawer' h.pk %}"
+                hx-target="#hearth-drawer"
+                hx-swap="innerHTML"
+                onclick="document.getElementById('hearth-drawer').classList.add('open')">
+          <span class="tile-tag">{{ h.tag }}</span>
+          <span class="tile-phase">{{ h.get_phase_display }}</span>
+          <span class="tile-grade">{{ h.resinGrade }}</span>
+          {% if open %}
+          <span class="tile-temp mono">目标 {{ open.targetSoftPointC }}℃</span>
+          <span class="tile-lot">{{ open.resinLot.lotCode }}</span>
+          {% else %}
+          <span class="tile-temp mono muted">无开灶</span>
+          {% endif %}
+        </button>
+        {% endwith %}
+        {% endfor %}
+      </div>
     </div>
   </div>
   {% empty %}

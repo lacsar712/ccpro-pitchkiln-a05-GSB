@@ -72,7 +72,24 @@
 
   <section class="drawer-block">
     <h3>切换相位</h3>
-    <p class="hint">进入「出胶」须当前值守至少一条探针 ≤95℃。</p>
+    <p class="hint">
+      进入「出胶」须当前值守至少一条探针 ≤95℃。<br>
+      进入「升温 / 保温」受夜班在岗卡限制：
+      在岗数只数<b>升温 + 保温</b>灶，出胶、冷灶、装料均不计。
+    </p>
+    {% if duty_card %}
+    <p class="duty-line">
+      过道 {{ hearth.lane }} 今日在岗
+      <b class="mono {% if duty_active >= duty_card.maxActiveHearths %}over{% endif %}">{{ duty_active }}</b>/<b class="mono">{{ duty_card.maxActiveHearths }}</b>
+      · {{ duty_card.shiftName }} · 主管 {{ duty_card.supervisorName }}
+      <a href="{% url 'edit_night_duty_card' duty_card.pk %}">改上限</a>
+    </p>
+    {% else %}
+    <p class="duty-line no-card">
+      过道 {{ hearth.lane }} 今日无夜班在岗卡 —
+      改入升温/保温将被拒绝，请先<a href="{% url 'night_duty_cards' %}">建卡</a>。
+    </p>
+    {% endif %}
     <form method="post" action="{% url 'change_phase' hearth.pk %}"
           class="stack-form"
           hx-post="{% url 'change_phase' hearth.pk %}"

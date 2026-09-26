@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}夜班在岗卡{% endblock %}
+{% block content %}
+<section class="feed-head">
+  <div>
+    <h1>夜班在岗卡</h1>
+    <p class="board-sub">
+      同一过道、同一自然日、同一班次仅一张卡 ·
+      在岗数只计<b>升温 + 保温</b>灶，出胶 / 冷灶 / 装料不计
+    </p>
+  </div>
+  <a class="back-link" href="{% url 'home' %}">← 回值守看板</a>
+</section>
+
+<div class="feed-layout">
+  <form method="post" class="lot-intake stack-form">
+    {% csrf_token %}
+    <h2>建卡</h2>
+    {{ form.as_p }}
+    <button type="submit" class="btn-ember">建夜班在岗卡</button>
+    <p class="ember-hint">
+      过道 + 值班日 + 班次三者唯一；上限即该班次允许同时升温/保温的灶数。
+    </p>
+  </form>
+
+  <ol class="lot-feed duty-feed">
+    {% for card in cards %}
+    <li class="lot-card duty-card">
+      <div class="lot-code">
+        过道 {{ card.lane }} · {{ card.dutyDate|date:"Y-m-d" }} · {{ card.shiftName }}
+      </div>
+      <div class="lot-place">值班主管：{{ card.supervisorName }}</div>
+      <div class="lot-meta">
+        <span>上限 <b class="mono">{{ card.maxActiveHearths }}</b> 灶</span>
+        {% if card.live_active is not None %}
+        <span class="{% if card.live_active >= card.maxActiveHearths %}duty-full{% else %}duty-free{% endif %}">
+          实时在岗 <b class="mono">{{ card.live_active }}</b>/<b class="mono">{{ card.maxActiveHearths }}</b>
+        </span>
+        {% else %}
+        <span class="muted">历史卡 · 不计实时在岗</span>
+        {% endif %}
+        <a class="back-link" href="{% url 'edit_night_duty_card' card.pk %}">改上限</a>
+      </div>
+    </li>
+    {% empty %}
+    <li class="lot-card empty">尚无在岗卡 — 不建卡无法把灶切到升温/保温</li>
+    {% endfor %}
+  </ol>
+</div>
+{% endblock %}

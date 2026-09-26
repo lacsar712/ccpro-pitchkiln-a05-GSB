@@ -3,11 +3,11 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
+from .models import CookRun, FireHearth, NightDutyCard, ResinLot, SoftPointProbe
 
 
 def ensure_seed_data():
-    """幂等种子：账号 + 来脂批 / 灶台 / 值守 / 探针。"""
+    """幂等种子：账号 + 来脂批 / 灶台 / 值守 / 探针 + 夜班在岗卡。"""
     User = get_user_model()
 
     if not User.objects.filter(username="admin").exists():
@@ -15,6 +15,14 @@ def ensure_seed_data():
 
     if not User.objects.filter(username="worker").exists():
         User.objects.create_user("worker", "worker@pitchkiln.local", "123456")
+
+    # 夜班在岗卡（幂等）：一过道今日上限 1，该过道已有一灶升温（坳火-乙）。
+    NightDutyCard.objects.get_or_create(
+        lane=1,
+        dutyDate=timezone.localdate(),
+        shiftName="夜班",
+        defaults={"maxOnDuty": 1, "supervisorName": "祁师傅"},
+    )
 
     if FireHearth.objects.exists():
         return
@@ -41,7 +49,7 @@ def ensure_seed_data():
     )
 
     h1 = FireHearth.objects.create(
-        lane=1,
+        lane=3,
         tag="坳火-甲",
         resinGrade="特级脂",
         phase=FireHearth.PHASE_HOLDING,

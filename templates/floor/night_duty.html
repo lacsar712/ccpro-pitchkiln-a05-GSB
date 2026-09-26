@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}夜班在岗{% endblock %}
+{% block content %}
+<section class="feed-head">
+  <div>
+    <h1>夜班在岗卡</h1>
+    <p class="board-sub">一过道 · 一自然日 · 一班次 一卡 · 在岗只数升温与保温</p>
+  </div>
+  <a class="back-link" href="{% url 'home' %}">← 回值守看板</a>
+</section>
+
+<div class="feed-layout">
+  <form method="post" class="lot-intake stack-form">
+    {% csrf_token %}
+    <h2>建卡 / 改上限</h2>
+    <p class="hint">
+      同过道、同值班日、同班次再次提交即为改卡；
+      下一笔装料→升温、升温→保温立即吃新上限。
+    </p>
+    {{ form.as_p }}
+    <button type="submit" class="btn-ember">写入在岗卡</button>
+  </form>
+
+  <div class="duty-panel">
+    <h2 class="duty-title">今日在岗卡 · {{ today|date:"Y-m-d" }}</h2>
+    <ol class="lot-feed">
+      {% for row in cards_today %}
+      <li class="lot-card duty-card">
+        <div class="lot-code">过道 {{ row.card.lane }} · {{ row.card.shiftName }}</div>
+        <div class="lot-place">值班主管 {{ row.card.supervisorName }}</div>
+        <div class="lot-meta">
+          <span class="mono">在岗 {{ row.on_duty }} / 上限 {{ row.card.maxOnDuty }}</span>
+          {% if row.on_duty >= row.card.maxOnDuty %}
+          <span class="duty-full">已达上限</span>
+          {% else %}
+          <span class="duty-open">未达上限</span>
+          {% endif %}
+        </div>
+      </li>
+      {% empty %}
+      <li class="lot-card empty">今日尚无在岗卡 — 各过道升温 / 保温两步将被拦截</li>
+      {% endfor %}
+    </ol>
+
+    {% if recent_cards %}
+    <h2 class="duty-title">历史卡</h2>
+    <ol class="lot-feed">
+      {% for card in recent_cards %}
+      <li class="lot-card">
+        <div class="lot-code">过道 {{ card.lane }} · {{ card.shiftName }}</div>
+        <div class="lot-meta">
+          <span class="mono">上限 {{ card.maxOnDuty }}</span>
+          <span>{{ card.dutyDate|date:"Y-m-d" }} · {{ card.supervisorName }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

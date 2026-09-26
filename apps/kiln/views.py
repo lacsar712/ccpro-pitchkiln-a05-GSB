@@ -8,9 +8,19 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import OpenCookRunForm, PhaseChangeForm, ResinLotForm, SoftPointProbeForm
-from .models import CookRun, FireHearth, ResinLot
-from .services.floor_rules import change_hearth_phase
+from .forms import (
+    NightDutyCardForm,
+    OpenCookRunForm,
+    PhaseChangeForm,
+    ResinLotForm,
+    SoftPointProbeForm,
+)
+from .models import CookRun, FireHearth, NightDutyCard, ResinLot
+from .services.floor_rules import (
+    change_hearth_phase,
+    latest_duty_card,
+    on_duty_count,
+)
 
 
 def _wants_htmx(request):
@@ -34,13 +44,22 @@ def _board_context():
     lanes = {}
     for h in hearths:
         lanes.setdefault(h.lane, []).append(h)
+    lane_rows = [
+        {
+            "lane": lane,
+            "tiles": tiles,
+            "on_duty": on_duty_count(lane),
+            "card": latest_duty_card(lane),
+        }
+        for lane, tiles in sorted(lanes.items())
+    ]
     phase_legend = [
         (key, label, sum(1 for h in hearths if h.phase == key))
         for key, label in FireHearth.PHASE_CHOICES
     ]
     return {
         "hearths": hearths,
-        "lanes": sorted(lanes.items()),
+        "lanes": lane_rows,
         "phase_legend": phase_legend,
     }
 
@@ -209,3 +228,45 @@ def resin_lot_feed(request):
 
     lots = ResinLot.objects.all()[:40]
     return render(request, "resin/feed.html", {"lots": lots, "form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def night_duty(request):
+    """夜班在岗卡：建卡 / 改上限。同过道+值班日+班次再提交即改卡。"""
+    today = timezone.localdate()
+    if request.method == "POST":
+        form = NightDutyCardForm(request.POST)
+        if form.is_valid():
+            card, created = NightDutyCard.objects.update_or_create(
+                lane=form.cleaned_data["lane"],
+                dutyDate=form.cleaned_data["dutyDate"],
+                shiftName=form.cleaned_data["shiftName"],
+                defaults={
+                    "maxOnDuty": form.cleaned_data["maxOnDuty"],
+                    "supervisorName": form.cleaned_data["supervisorName"],
+                },
+            )
+            verb = "已建卡" if created else "已改卡"
+            messages.success(
+                request, f"{verb}：{card}，下一笔改相位立即吃新上限"
+            )
+            return redirect("night_duty")
+    else:
+        form = NightDutyCardForm()
+
+    cards_today = [
+        {"card": card, "on_duty": on_duty_count(card.lane)}
+        for card in NightDutyCard.objects.filter(dutyDate=today).order_by("lane")
+    ]
+    recent_cards = NightDutyCard.objects.exclude(dutyDate=today)[:20]
+    return render(
+        request,
+        "floor/night_duty.html",
+        {
+            "form": form,
+            "today": today,
+            "cards_today": cards_today,
+            "recent_cards": recent_cards,
+        },
+    )

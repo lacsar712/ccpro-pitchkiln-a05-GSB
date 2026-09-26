@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
+from .models import CookRun, FireHearth, NightDutyCard, ResinLot, SoftPointProbe
 
 
 @admin.register(ResinLot)
@@ -34,3 +34,17 @@ class CookRunAdmin(admin.ModelAdmin):
 class SoftPointProbeAdmin(admin.ModelAdmin):
     list_display = ("id", "run", "sampledAt", "softPointC", "samplerName")
     search_fields = ("samplerName",)
+
+
+@admin.register(NightDutyCard)
+class NightDutyCardAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "lane",
+        "dutyDate",
+        "shiftName",
+        "maxOnDuty",
+        "supervisorName",
+    )
+    list_filter = ("dutyDate", "lane")
+    search_fields = ("shiftName", "supervisorName")

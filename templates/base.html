@@ -14,6 +14,7 @@
     <a class="mark" href="{% url 'home' %}">Pitch<br>Kiln</a>
     <nav class="strip-nav">
       <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}on{% endif %}" title="值守看板">灶</a>
+      <a href="{% url 'night_duty' %}" class="{% if request.resolver_match.url_name == 'night_duty' %}on{% endif %}" title="夜班在岗">夜</a>
       <a href="{% url 'resin_lot_feed' %}" class="{% if request.resolver_match.url_name == 'resin_lot_feed' %}on{% endif %}" title="来脂批">脂</a>
     </nav>
     <div class="strip-foot">

@@ -89,6 +89,36 @@ class CookRun(models.Model):
         return self.closedAt is None
 
 
+class NightDutyCard(models.Model):
+    """夜班在岗卡：同一自然日、同一过道、同一班次唯一。
+
+    限制该过道当日同时处于「升温 / 保温」的灶台数。
+    """
+
+    lane = models.PositiveIntegerField("过道号")
+    dutyDate = models.DateField("值班日")
+    shiftName = models.CharField("班次名称", max_length=40)
+    maxOnDuty = models.PositiveIntegerField("上限灶数")
+    supervisorName = models.CharField("值班主管姓名", max_length=80)
+
+    class Meta:
+        ordering = ["-dutyDate", "lane", "-id"]
+        verbose_name = "夜班在岗卡"
+        verbose_name_plural = "夜班在岗卡"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lane", "dutyDate", "shiftName"],
+                name="uniq_duty_card_lane_date_shift",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"过道{self.lane} · {self.dutyDate:%Y-%m-%d} · {self.shiftName}"
+            f"（上限 {self.maxOnDuty}）"
+        )
+
+
 class SoftPointProbe(models.Model):
     run = models.ForeignKey(
         CookRun,
